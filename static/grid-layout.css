@@ -1,0 +1,79 @@
+/* Grid containers */
+#calendar
+{
+    display: grid;
+    width: 100%;
+    column-gap: 5px;
+    row-gap: 5px;
+}
+
+#weekday-row
+{
+    display: grid;
+    width: 100%;
+    column-gap: 5px;
+    grid-auto-columns: calc((100% - 30px) / 7); /*Make the weekday headers equally sized by making their width equal to 1/7 of (calendar width - total of gaps between columns)*/
+    margin-bottom: 5px;
+}
+
+/* Grid rows */
+.row1
+{
+    grid-row: 1/2;
+}
+
+.row2
+{
+    grid-row: 2/3;
+}
+
+.row3
+{
+    grid-row: 3/4;
+}
+
+.row4
+{
+    grid-row: 4/5;
+}
+
+.row6
+{
+    grid-row: 5/6;
+}
+
+/* Grid columns */
+.col1
+{
+    grid-column: 1/2;
+}
+
+.col2
+{
+    grid-column: 2/3;
+}
+
+.col3
+{
+    grid-column: 3/4;
+}
+
+.col4
+{
+    grid-column: 4/5;
+}
+
+.col5
+{
+    grid-column: 5/6;
+}
+
+.col6
+{
+    grid-column: 6/7;
+}
+
+.col7
+{
+    grid-column: 7/8;
+}
