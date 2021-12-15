@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql');
 const crypto = require('crypto');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = 80;
@@ -39,16 +40,61 @@ app.use(express.static('static'));
 app.use(express.urlencoded({
     extended: true
 }));
+app.use(cookieParser('amogus'));
 
 // Home page: Generates a monthly calendar for the current month
 app.get('/', (req, res) => {
-    let d = new Date();
-    let content = HTML_HEAD;
-    content += generateMonthlyCalendar(d);
-    content += HTML_END;
-    res.send(content);
+    let username = '';
+    let queryFinished = false;
+    let sessionID = req.signedCookies.session;
+
+    // If there is a session cookie, get the associated username from the database
+    if (sessionID)
+    {
+        let conn = mysql.createConnection(DB_CONFIG);
+        let query = `SELECT username FROM Sessions WHERE sessionID = "${sessionID}";`;
+        conn.query(query, (err, rows, fields) => {
+            if (err)
+            {
+                console.log(err);
+                queryFinished = true;
+            }
+            else if (rows.length > 0)
+            {
+                username = rows[0].username;
+                queryFinished = true;
+            }
+            else
+            {
+                // If session is invalid, then delete the cookie
+                console.log('Invalid session ID');
+                res.clearCookie('session');
+                queryFinished = true;
+            }
+
+            let d = new Date();
+            let content = HTML_HEAD;
+            content += generateNavBar(username, 'home');
+            content += generateMonthlyCalendar(d);
+            content += HTML_END;
+            res.send(content);
+            return;
+        });
+    }
+    else
+    {
+        let d = new Date();
+        let content = HTML_HEAD;
+        content += generateNavBar('', 'home');
+        content += generateMonthlyCalendar(d);
+        content += HTML_END;
+        res.send(content);
+    }
+
+    
 });
 
+// Checks whether a username is in use and whether it contains invalid characters
 app.get('/check-username', (req, res) => {
     let username = req.query.username;
     if (!username || username.length < 3)
@@ -98,6 +144,7 @@ app.get('/check-username', (req, res) => {
     
 });
 
+// Checks whether an email address is in use and whether it contains invalid characters
 app.get('/check-email', (req, res) => {
     let email = req.query.email;
     if (!email)
@@ -147,11 +194,14 @@ app.get('/check-email', (req, res) => {
     
 });
 
+// Creates a new account, creates a session for the new account, and redirects the user to the home page with the new session cookie
 app.post('/create-account', (req, res) => {
+    // Get params from request body
     let username = req.body.username;
     let email = req.body.email;
     let password = req.body.password;
 
+    // Make sure all required parameters are present and valid
     if (!username || containsBannedCharacters(username, USERNAME_WHITELIST))
     {
         res.redirect('/login.html?error=1');
@@ -168,15 +218,13 @@ app.post('/create-account', (req, res) => {
         return;
     }
 
+    // Encrypt password
     let [encryptedPassword, salt] = encryptPassword(password);
-
-    console.log(`Creating new account!
-        Username: ${username}
-        Email: ${email}
-        Encrypted password: ${encryptedPassword}
-        Password salt: ${salt}`);
     
+    // Get current date
     let d = new Date();
+
+    // Connect to DB and send INSERT query
     let conn = mysql.createConnection(DB_CONFIG);
     let query = `INSERT INTO Users(username, email, isAdmin, passwdSalt, passwd, creationDate) VALUES(
         "${username}",
@@ -195,8 +243,24 @@ app.post('/create-account', (req, res) => {
         }
         else
         {
-            res.redirect('/');
-            return;
+            // Create a new session for the new account
+            let sessionID = randomString(128);
+            let sessionQuery = `INSERT INTO Sessions(sessionID, username) VALUES ("${sessionID}", "${username}");`;
+            conn.query(sessionQuery, (err, rows, fields) => {
+                if (err)
+                {
+                    console.log(err);
+                    res.redirect('/login.html?error=5');
+                    return;
+                }
+                else
+                {
+                    res.cookie('session', sessionID, {signed: true});
+                    res.redirect('/');
+                    return;
+                }
+            });
+            
         }
     });
 });
@@ -297,6 +361,49 @@ function generateMonthlyCalendar(date)
     </div>
     </div>
     `;
+
+    return content;
+}
+
+function generateNavBar(username, activePage)
+{
+    let content = '';
+    if (username)
+    {
+        content += `
+        <header id='page-header'>
+            <h2 id='header-title'>Calendar</h2>
+            <p id='header-greeting'>Logged in as ${username}</p>
+            <nav id='nav-bar'>
+                <div class='nav-item'>
+                    <a href='/sign-out' class='nav-link'>Log Out</a>
+                </div>
+                <div class='nav-item ${activePage === 'calendars' ? 'active' : ''}'>
+                    <a href='/calendars' class='nav-link'>Your Calendars</a>
+                </div>
+                <div class='nav-item ${activePage === 'home' ? 'active' : ''}'>
+                    <a href='/' class='nav-link'>Home</a>
+                </div>            
+            </nav>
+        </header>
+        `;
+    }
+    else
+    {
+        content += `
+        <header id='page-header'>
+            <h2 id='header-title'>Calendar</h2>
+            <nav id='nav-bar'>
+                <div class='nav-item'>
+                    <a href='/login' class='nav-link'>Log In</a>
+                </div>
+                <div class='nav-item active'>
+                    <a href='/' class='nav-link'>Home</a>
+                </div>            
+            </nav>
+        </header>
+        `;
+    }
 
     return content;
 }

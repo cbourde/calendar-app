@@ -19,6 +19,12 @@ body
     display: inline-block;
 }
 
+#header-greeting
+{
+    display: inline-block;
+    margin-left: 2%;
+}
+
 /* Nav bar stuff =========================================== */
 #nav-bar
 {
@@ -29,7 +35,7 @@ body
 {
     float: right;
     height: 100%;
-    width: 5%;
+    width: 8%;
     text-align: center;
 }
 
