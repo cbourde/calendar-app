@@ -4,6 +4,155 @@ body
     background-color: rgb(50, 50, 50);
 }
 
+#page-header
+{
+    color: white;
+    background-color: black;
+    height: 3em;
+}
+
+#header-title
+{
+    margin-left: 10px;
+    margin-top: 0.4em;
+    margin-bottom: 0px;
+    display: inline-block;
+}
+
+/* Nav bar stuff =========================================== */
+#nav-bar
+{
+    display: inline;
+}
+
+.nav-item
+{
+    float: right;
+    height: 100%;
+    width: 5%;
+    text-align: center;
+}
+
+.nav-item:hover
+{
+    background-color: dimgrey;
+}
+
+.active
+{
+    background-color: dimgrey;
+}
+
+.nav-link
+{
+    display: block;
+    color: white;
+    text-decoration: none;
+    margin-top: 0.8em;
+}
+
+/* Login form stuff ============================================= */
+
+#content-container
+{
+    width: 50%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.login-form-container
+{
+    background-color: dimgrey;
+    width: 40%;
+    margin-top: 5em;
+    border-radius: 5px;
+    box-shadow: 5px 5px 5px rgb(20, 20, 20);
+}
+
+.left
+{
+    float: left;
+    margin-left: 8%;
+}
+
+.right
+{
+    float: right;
+    margin-right: 8%;
+}
+
+.form-header
+{
+    text-align: center;
+    margin-top: 1em;
+}
+
+.form-input
+{
+    width: 75%;
+    height: 2em;
+    border: 0px;
+    border-radius: 5px;
+    background-color: darkgrey;
+    margin-left: 12.5%;
+    margin-bottom: 5px;
+}
+
+.form-label
+{
+    margin-left: 12.5%;
+}
+
+.form-button
+{
+    width: 60%;
+    height: 2em;
+    margin-left: 20%;
+    margin-bottom: 10px;
+    margin-top: 5px;
+    background-color:rgb(50, 50, 50);
+    border: 0px;
+    border-radius: 5px;
+    color: white;
+}
+
+.form-button:disabled
+{
+    background-color: darkgrey !important;
+}
+
+.form-status
+{
+    font-size: 0.8em;
+    margin-left: 12.5%;
+    font-style: italic;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    max-width: 85%;
+}
+
+.highlight-red
+{
+    border: 1px solid darkred;
+}
+
+.highlight-green
+{
+    border: 1px solid rgb(0, 80, 0);
+}
+
+.red
+{
+    color: darkred;
+}
+
+.green
+{
+    color: rgb(0, 70, 0);
+}
+
+/* Monthly calendar stuff ================================================ */
+
 h1.title
 {
     text-align: center;
@@ -38,16 +187,21 @@ h2.month-header{
 
 .day
 {
-    height: 10em;
+    height: 7.5em;
     background-color: dimgrey;
     border-radius: 5px;
 }
 
 .empty-day
 {
-    height: 10em;
+    height: 7.5em;
     background-color: rgb(69, 69, 69);
     border-radius: 5px;
+}
+
+.current-day
+{
+    background-color: darkslategrey !important;
 }
 
 .day-header

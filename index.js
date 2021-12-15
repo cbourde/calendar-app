@@ -1,5 +1,6 @@
 const express = require('express');
 const mysql = require('mysql');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = 80;
@@ -31,15 +32,173 @@ const HTML_END = `
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const USERNAME_WHITELIST = `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_`;
+const EMAIL_WHITELIST = USERNAME_WHITELIST + `@+.`;
 
 app.use(express.static('static'));
+app.use(express.urlencoded({
+    extended: true
+}));
 
+// Home page: Generates a monthly calendar for the current month
 app.get('/', (req, res) => {
     let d = new Date();
     let content = HTML_HEAD;
     content += generateMonthlyCalendar(d);
     content += HTML_END;
     res.send(content);
+});
+
+app.get('/check-username', (req, res) => {
+    let username = req.query.username;
+    if (!username || username.length < 3)
+    {
+        res.json({
+            available: false,
+            status: "Username must be at least 3 characters long"
+        });
+        return;
+    }
+    else if (containsBannedCharacters(username, USERNAME_WHITELIST)) {
+        res.json({
+            available: false,
+            status: "Username can only contain alphanumeric characters and underscores"
+        });
+        return;
+    }
+    username = username.toLowerCase();
+    let conn = mysql.createConnection(DB_CONFIG);
+    let query = `SELECT * FROM Users
+    WHERE username = "${username}";`;
+    conn.query(query, (err, rows, fields) => {
+        if (err)
+        {
+            console.log(err);
+            res.json({
+                available: false,
+                status: "DB error - see server log"
+            });
+            return;
+        }
+        if (rows.length === 0)
+        {
+            res.json({
+                available: true,
+                status: "Username is available"
+            });
+            return;
+        }
+        else {
+            res.json({
+                available: false,
+                status: "Username is already in use"
+            });
+        }
+    });
+    
+});
+
+app.get('/check-email', (req, res) => {
+    let email = req.query.email;
+    if (!email)
+    {
+        res.json({
+            available: false,
+            status: "Email is required"
+        });
+        return;
+    }
+    else if (containsBannedCharacters(email, EMAIL_WHITELIST)) {
+        res.json({
+            available: false,
+            status: "Email can only contain alphanumeric characters and the following special characters: _ + . @"
+        });
+        return;
+    }
+    email = email.toLowerCase();
+    let conn = mysql.createConnection(DB_CONFIG);
+    let query = `SELECT * FROM Users
+    WHERE email = "${email}";`;
+    conn.query(query, (err, rows, fields) => {
+        if (err)
+        {
+            console.log(err);
+            res.json({
+                available: false,
+                status: "DB error - see server log"
+            });
+            return;
+        }
+        if (rows.length === 0)
+        {
+            res.json({
+                available: true,
+                status: "Email is valid and not in use"
+            });
+            return;
+        }
+        else {
+            res.json({
+                available: false,
+                status: "Email is already in use"
+            });
+        }
+    });
+    
+});
+
+app.post('/create-account', (req, res) => {
+    let username = req.body.username;
+    let email = req.body.email;
+    let password = req.body.password;
+
+    if (!username || containsBannedCharacters(username, USERNAME_WHITELIST))
+    {
+        res.redirect('/login.html?error=1');
+        return;
+    }
+    if (!email || containsBannedCharacters(email, EMAIL_WHITELIST))
+    {
+        res.redirect('/login.html?error=2');
+        return;
+    }
+    if (!password)
+    {
+        res.redirect('/login.html?error=3');
+        return;
+    }
+
+    let [encryptedPassword, salt] = encryptPassword(password);
+
+    console.log(`Creating new account!
+        Username: ${username}
+        Email: ${email}
+        Encrypted password: ${encryptedPassword}
+        Password salt: ${salt}`);
+    
+    let d = new Date();
+    let conn = mysql.createConnection(DB_CONFIG);
+    let query = `INSERT INTO Users(username, email, isAdmin, passwdSalt, passwd, creationDate) VALUES(
+        "${username}",
+        "${email}",
+        0,
+        "${salt}",
+        "${encryptedPassword}",
+        "${d.toISOString().substr(0, 19).replace('T', ' ')}"
+    );`;
+    conn.query(query, (err, rows, fields) => {
+        if (err)
+        {
+            console.log(err);
+            res.redirect("/login.html?error=5");
+            return;
+        }
+        else
+        {
+            res.redirect('/');
+            return;
+        }
+    });
 });
 
 // Generates a calendar for the month specified by the given date object
@@ -58,6 +217,12 @@ function generateMonthlyCalendar(date)
     // Create a temporary date object to find the first weekday of the month
     let wd = new Date(year, month);
     let firstWeekday = wd.getDay();
+
+    // Create a date object for the current date to highlight the current date on the calendar
+    let cd = new Date();
+    let cDate = cd.getDate();
+    let cMonth = cd.getMonth();
+    let cYear = cd.getFullYear();
 
     // Month and year header
     let content = `
@@ -111,7 +276,7 @@ function generateMonthlyCalendar(date)
             else
             {
                 content += `
-                <div class='row${row + 1} col${day + 1} day'>
+                <div class='row${row + 1} col${day + 1} day ${(cDate === currentDay && cMonth === month && cYear === year) ? 'current-day' : ''}'>
                 <div class='day-header'>
                     <h2 class='day-number'>${currentDay}</h2>
                 </div>
@@ -134,6 +299,59 @@ function generateMonthlyCalendar(date)
     `;
 
     return content;
+}
+
+/**
+ * Encrypts a password using a random salt or one provided as a parameter
+ * @param {string} password The password to encrypt
+ * @param {string} salt Optional - password will be encrypted using this salt, or a new one will be generated if not provided
+ * @returns 2-element array containing the encrypted password and the salt used to encrypt it
+ */
+function encryptPassword(password, salt)
+{
+    if (salt === undefined)
+        salt = randomString(32);
+    let pepper = 'bruhmoment42069lmao';
+    let saltedPasswd = salt + password + pepper;
+    let encryptedPasswd = crypto.createHash('sha512').update(saltedPasswd).digest('base64');
+    return [encryptedPasswd, salt];
+}
+
+/**
+ * Generates a random string of n characters in [A-Za-z0-9]
+ * @param {number} n The length of the string
+ * @returns A random string of n characters
+ */
+function randomString(n)
+{
+    let salt = '';
+    let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < n; i++)
+    {
+        let index = Math.floor(Math.random() * characters.length);
+        salt += characters[index];
+    }
+    return salt;
+}
+
+/**
+ * Checks whether a string contains any characters not in the given whitelist string
+ * @param {string} str The string to validate
+ * @param {string} charList String containing all allowed characters
+ * @returns True if the string contains any characters not in the whitelist, false otherwise
+ */
+function containsBannedCharacters(str, charList)
+{
+    // For every character in the input string, if it's not in the whitelist then return true
+    for (let i = 0; i < str.length; i++)
+    {
+        let char = str[i];
+        if (!charList.includes(char))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 app.listen(PORT);

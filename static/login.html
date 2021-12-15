@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log In</title>
+    <link rel='stylesheet' href='style.css'>
+</head>
+<body>
+    <header id='page-header'>
+        <h2 id='header-title'>Calendar</h2>
+        <nav id='nav-bar'>
+            <div class='nav-item active'>
+                <a href='/login' class='nav-link'>Log In</a>
+            </div>
+            <div class='nav-item'>
+                <a href='/' class='nav-link'>Home</a>
+            </div>            
+        </nav>
+    </header>
+    <div id='content-container'>
+        <!-- Log In -->
+        <div class='login-form-container left'>
+            <h2 class='form-header'>Log In</h2>
+            <form action='/login' method='post' name='login'>
+                <!-- Username -->
+                <label for='username' class='form-label'>Username</label>
+                <br>
+                <input type='text' name='username' class='form-input' id='login-username' required>
+                <br>
+                <!-- Password -->
+                <label for='password' class='form-label'>Password</label>
+                <br>
+                <input type='password' name='password' class='form-input' id='login-password' required>
+                <br>
+                <input type='submit' class='form-button' value='Log In'>
+            </form>
+        </div>
+        <!-- Create Account -->
+        <div class='login-form-container right'>
+            <h2 class='form-header'>Create New Account</h2>
+            <form action='/create-account' method='post' name='login' id='signup-form'>
+                <!-- Username -->
+                <label for='username' class='form-label'>Username</label>
+                <br>
+                <input type='text' name='username' class='form-input' id='signup-username' required>
+                <p id='username-status' class='form-status' style='display: none'>Username Status</p>
+                <!-- Email -->
+                <label for='email' class='form-label'>Email</label>
+                <br>
+                <input type='text' name='email' class='form-input' id='signup-email' required>
+                <p id='email-status' class='form-status' style='display: none'>Email Status</p>
+                <!-- Password -->
+                <label for='password' class='form-label'>Password</label>
+                <br>
+                <input type='password' name='password' class='form-input' id='signup-password' required>
+                <p class='form-status'>Password requirements:</p>
+                <p class='form-status' id='password-length'>- At least 8 characters long</p>
+                <p class='form-status' id='password-lowercase'>- Contains at least one lowercase letter</p>
+                <p class='form-status' id='password-uppercase'>- Contains at least one uppercase letter</p>
+                <p class='form-status' id='password-number'>- Contains at least one number</p>
+                <p class='form-status' id='password-special'>- Contains at least one special character</p>
+                <!-- Password Confirmation -->
+                <label for='password-confirm' class='form-label'>Confirm password</label>
+                <br>
+                <input type='password' name='password-confirm' class='form-input' id='signup-confirm' required>
+                <p id='password-confirm-status' class='form-status' style='display: none'>Confirmation Status</p>
+                <input type='submit' class='form-button' id='signup-submit' value='Create Account'>
+            </form>
+        </div>
+    </div>
+    <script src='login.js'></script>
+</body>
+</html>
