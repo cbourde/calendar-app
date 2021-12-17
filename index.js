@@ -26,6 +26,7 @@ const HTML_HEAD = `
 <body>
 `;
 const HTML_END = `
+<script src='alert.js'></script>
 </body>
 </html>
 `;
@@ -45,7 +46,6 @@ app.use(cookieParser('amogus'));
 // Home page: Generates a monthly calendar for the current month
 app.get('/', (req, res) => {
     let username = '';
-    let queryFinished = false;
     let sessionID = req.signedCookies.session;
 
     // If there is a session cookie, get the associated username from the database
@@ -57,19 +57,16 @@ app.get('/', (req, res) => {
             if (err)
             {
                 console.log(err);
-                queryFinished = true;
             }
             else if (rows.length > 0)
             {
                 username = rows[0].username;
-                queryFinished = true;
             }
             else
             {
                 // If session is invalid, then delete the cookie
                 console.log('Invalid session ID');
                 res.clearCookie('session');
-                queryFinished = true;
             }
 
             let d = new Date();
@@ -78,6 +75,7 @@ app.get('/', (req, res) => {
             content += generateMonthlyCalendar(d);
             content += HTML_END;
             res.send(content);
+            conn.end();
             return;
         });
     }
@@ -124,6 +122,7 @@ app.get('/check-username', (req, res) => {
                 available: false,
                 status: "DB error - see server log"
             });
+            conn.end();
             return;
         }
         if (rows.length === 0)
@@ -132,6 +131,7 @@ app.get('/check-username', (req, res) => {
                 available: true,
                 status: "Username is available"
             });
+            conn.end();
             return;
         }
         else {
@@ -139,9 +139,10 @@ app.get('/check-username', (req, res) => {
                 available: false,
                 status: "Username is already in use"
             });
+            conn.end();
+            return;
         }
     });
-    
 });
 
 // Checks whether an email address is in use and whether it contains invalid characters
@@ -174,6 +175,7 @@ app.get('/check-email', (req, res) => {
                 available: false,
                 status: "DB error - see server log"
             });
+            conn.end();
             return;
         }
         if (rows.length === 0)
@@ -182,6 +184,7 @@ app.get('/check-email', (req, res) => {
                 available: true,
                 status: "Email is valid and not in use"
             });
+            conn.end();
             return;
         }
         else {
@@ -189,9 +192,82 @@ app.get('/check-email', (req, res) => {
                 available: false,
                 status: "Email is already in use"
             });
+            conn.end();
+            return;
         }
     });
-    
+});
+
+app.post('/login', (req, res) => {
+    let username = req.body.username;
+    let password = req.body.password;
+
+    if (!username || containsBannedCharacters(username, USERNAME_WHITELIST))
+    {
+        res.redirect('/login.html?error=1');
+        return;
+    }
+    if (!password)
+    {
+        res.redirect('/login.html?error=3');
+        return;
+    }
+
+    let conn = mysql.createConnection(DB_CONFIG);
+    let query = `SELECT * FROM Users WHERE username = '${username}';`
+    conn.query(query, (err, rows, fields) => {
+        if (err)
+        {
+            console.log(err);
+            res.redirect('/login.html?error=5');
+            conn.end();
+            return;
+        }
+        else if (rows.length === 0)
+        {
+            res.redirect('/login.html?error=4');
+            conn.end();
+            return;
+        }
+        else
+        {
+            let salt = rows[0].passwdSalt;
+            let encryptedPassword = rows[0].passwd;
+            if (encryptPassword(password, salt)[0] === encryptedPassword)
+            {
+                // Login successful - create a new session
+                let sessionID = randomString(128);
+                query = `INSERT INTO Sessions(sessionID, username) VALUES('${sessionID}', '${username}');`;
+                conn.query(query, (err, rows, fields) => {
+                    if (err)
+                    {
+                        console.log('Error creating new session:');
+                        console.log(err);
+                        conn.end();
+                        return;
+                    }
+                    else
+                    {
+                        res.cookie('session', sessionID, {signed: true});
+                        res.redirect('/');
+                        conn.end();
+                        return;
+                    }
+                });
+            }
+            else
+            {
+                // Invalid login
+                res.redirect('/login.html?error=4');
+                conn.end();
+                return;
+            }
+        }
+    });
+});
+
+app.get('/login', (req, res) => {
+    res.redirect('/login.html');
 });
 
 // Creates a new account, creates a session for the new account, and redirects the user to the home page with the new session cookie
@@ -239,6 +315,7 @@ app.post('/create-account', (req, res) => {
         {
             console.log(err);
             res.redirect("/login.html?error=5");
+            conn.end();
             return;
         }
         else
@@ -251,18 +328,70 @@ app.post('/create-account', (req, res) => {
                 {
                     console.log(err);
                     res.redirect('/login.html?error=5');
+                    conn.end();
                     return;
                 }
                 else
                 {
                     res.cookie('session', sessionID, {signed: true});
                     res.redirect('/');
+                    conn.end();
                     return;
                 }
             });
             
         }
     });
+});
+
+// Clears a user's session cookie and deletes all sessions with the same username from the database
+app.get('/sign-out', (req, res) => {
+    let sessionID = req.signedCookies.session;
+    if (sessionID)
+    {
+        let conn = mysql.createConnection(DB_CONFIG);
+        let query = `SELECT * FROM Sessions WHERE sessionID = '${sessionID}';`
+        conn.query(query, (err, rows, fields) => {
+            if (err)
+            {
+                console.log(err);
+                res.redirect('/login.html?error=5');
+                conn.end();
+                return;
+            }
+            else if (rows.length > 0)
+            {
+                let username = rows[0].username;
+                let deleteQuery = `DELETE FROM Sessions WHERE username = '${username}';`;
+                conn.query(deleteQuery, (err, rows, fields) => {
+                    if (err)
+                    {
+                        console.log(err);
+                        res.redirect('/login.html?error=5');
+                        conn.end();
+                        return;
+                    }
+                    res.clearCookie('session');
+                    res.redirect('/');
+                    conn.end();
+                    return;
+                });
+            }
+            else
+            {
+                res.clearCookie('session');
+                res.redirect('/');
+                conn.end();
+                return;
+            }
+        });
+        
+    }
+    else
+    {
+        res.redirect('/');
+        return;
+    }
 });
 
 // Generates a calendar for the month specified by the given date object
@@ -395,7 +524,7 @@ function generateNavBar(username, activePage)
             <h2 id='header-title'>Calendar</h2>
             <nav id='nav-bar'>
                 <div class='nav-item'>
-                    <a href='/login' class='nav-link'>Log In</a>
+                    <a href='/login.html' class='nav-link'>Log In</a>
                 </div>
                 <div class='nav-item active'>
                     <a href='/' class='nav-link'>Home</a>
